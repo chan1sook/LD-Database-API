@@ -1,0 +1,20 @@
+{
+  "name": "ld-database-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "LD Database API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app",
+    "dev": "nodemon app --delay 2 --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Natthawat Raocharoensinp",
+  "license": "ISC",
+  "dependencies": {
+    "compression": "^1.7.4",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "mongoose": "^5.11.12"
+  }
+}
