@@ -1,5 +1,5 @@
 const express = require("express");
-const { toLogObject, filterParams } = require("../utils");
+const { toLogObject, filterParams, checkMissingParams } = require("../utils");
 const StudentModel = require("../models/student");
 const ScoreModel = require("../models/score");
 const router = express.Router();
@@ -10,10 +10,8 @@ const router = express.Router();
 router.post("/score", async (req, res) => {
   const action = `${req.method} ${req.path}`;
   const params = [
-    "firstName",
-    "lastName",
-    "gender",
-    "grade",
+    "_id",
+    "stage",
     "minParScore",
     "maxParScore",
     "score",
@@ -24,16 +22,11 @@ router.post("/score", async (req, res) => {
     "scoreDifficultyFactor",
     "durationDifficultyFactor",
   ];
-  const parameters = filterParams(req.body, params);
+  const optionalParams = ["stage"];
+  const parameters = filterParams(req.body, params, optionalParams);
+  const missingParams = checkMissingParams(req.body, params, optionalParams);
 
   try {
-    const missingParams = [];
-    for (const param of params) {
-      if (typeof parameters[param] === "undefined") {
-        missingParams.push(param);
-      }
-    }
-
     if (missingParams.length > 0) {
       const strMissingParams = missingParams.join(", ");
       return res.status(400).json(
@@ -47,21 +40,6 @@ router.post("/score", async (req, res) => {
       );
     }
 
-    const firstName = parameters.firstName;
-    const lastName = parameters.lastName;
-    let gender = "others";
-    switch (parameters.gender) {
-      case "m":
-      case "male":
-        gender = "male";
-        break;
-      case "f":
-      case "female":
-        gender = "female";
-        break;
-    }
-
-    const grade = parameters.grade;
     const minParScore = parameters.minParScore;
     const maxParScore = parameters.maxParScore;
     if (minParScore > maxParScore) {
@@ -76,6 +54,22 @@ router.post("/score", async (req, res) => {
       );
     }
 
+    const _id = parameters._id;
+
+    const studentDoc = await StudentModel.findById(_id);
+    if (studentDoc === null) {
+      return res.status(404).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Student _id = '${_id}' Not found`,
+          },
+          parameters,
+        })
+      );
+    }
+
+    const stage = parameters.stage;
     const score = parameters.score;
     const minParDuration = parameters.minParDuration;
     const maxParDuration = parameters.maxParDuration;
@@ -96,27 +90,9 @@ router.post("/score", async (req, res) => {
     const scoreDifficultyFactor = parameters.scoreDifficultyFactor;
     const durationDifficultyFactor = parameters.durationDifficultyFactor;
 
-    let studentDoc = await StudentModel.findOne({
-      firstName,
-      lastName,
-    });
-
-    if (studentDoc === null) {
-      studentDoc = new StudentModel({
-        firstName,
-        lastName,
-        gender,
-        grade,
-      });
-    } else {
-      studentDoc.gender = gender;
-      studentDoc.grade = grade;
-      studentDoc.lastUpdateTimestamp = new Date();
-    }
-    await studentDoc.save();
-
     const scoreDoc = new ScoreModel({
       studentId: studentDoc._id,
+      stage,
       minParScore,
       maxParScore,
       score,
@@ -145,17 +121,29 @@ router.post("/score", async (req, res) => {
       })
     );
   } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      toLogObject({
-        action: "PUT /score",
-        response: {
-          error: "Server Error",
-          rawError: err.toString(),
-        },
-        parameters,
-      })
-    );
+    if (err.message.includes("Cast to ObjectId failed")) {
+      res.status(400).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Student _id = '${parameters._id}' Not found`,
+          },
+          parameters,
+        })
+      );
+    } else {
+      console.error(err);
+      res.status(500).json(
+        toLogObject({
+          action,
+          response: {
+            error: "Server Error",
+            rawError: err.toString(),
+          },
+          parameters,
+        })
+      );
+    }
   }
 });
 

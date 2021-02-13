@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const ScoreSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: "student" },
   timestamp: { type: Date, default: Date.now },
+  stage: { type: String, default: "" },
 
   minParScore: { type: Number, required: true },
   maxParScore: { type: Number, required: true },

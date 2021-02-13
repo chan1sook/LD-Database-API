@@ -12,6 +12,7 @@ const dbName = process.env.DB_NAME || "test";
 mongoose.connect(`mongodb://localhost/${dbName}`, {
   useUnifiedTopology: true,
   useNewUrlParser: true,
+  useCreateIndex: true,
 });
 
 if (process.env.NODE_ENV === "production") {
