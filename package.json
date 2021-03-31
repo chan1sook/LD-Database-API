@@ -14,7 +14,9 @@
   "dependencies": {
     "bcrypt": "^5.0.0",
     "compression": "^1.7.4",
+    "csv": "^5.4.0",
     "dotenv": "^8.2.0",
+    "excel4node": "^1.7.2",
     "express": "^4.17.1",
     "mongoose": "^5.11.12"
   }

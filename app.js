@@ -29,7 +29,7 @@ app.use(scoreRouter);
 
 const { toLogObject } = require("./utils");
 app.use("*", (req, res) => {
-  res.status(404).json(
+  return res.status(404).json(
     toLogObject({
       action: `${req.method} ${req.path}`,
       response: {

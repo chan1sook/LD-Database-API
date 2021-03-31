@@ -1,7 +1,14 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 
-const { toLogObject, filterParams, checkMissingParams } = require("../utils");
+const {
+  toLogObject,
+  filterParams,
+  checkMissingParams,
+  studentDocsToCSV,
+  studentDocsToXLSX,
+  studentDocsToJSON,
+} = require("../utils");
 const StudentModel = require("../models/student");
 const ScoreModel = require("../models/score");
 const router = express.Router();
@@ -242,7 +249,7 @@ router.get("/student", async (req, res) => {
     };
     const scoreArray = await ScoreModel.find(filter)
       .sort({ timestamp: -1 })
-      .limit(this.maxScoreDisplay);
+      .limit(studentDoc.maxScoreDisplay);
     response.scores = scoreArray.map((doc) => {
       const result = doc.toJSON();
       result.difficultyAdjustment = doc.difficultyAdjustment;
@@ -260,6 +267,136 @@ router.get("/student", async (req, res) => {
         parameters,
       })
     );
+  } catch (err) {
+    if (err.message.includes("Cast to ObjectId failed")) {
+      res.status(400).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Student _id = '${parameters._id}' Not found`,
+          },
+          parameters,
+        })
+      );
+    } else {
+      console.error(err);
+      res.status(500).json(
+        toLogObject({
+          action,
+          response: {
+            error: "Server Error",
+            rawError: err.toString(),
+          },
+          parameters,
+        })
+      );
+    }
+  }
+});
+
+/**
+ * Export Student Data
+ */
+router.get("/export", async (req, res) => {
+  const action = `${req.method} ${req.path}`;
+  const params = ["_id"];
+  const optionalParams = ["format", "stage", "limit"];
+  const parameters = filterParams(req.query, params, optionalParams);
+  const missingParams = checkMissingParams(parameters, params, optionalParams);
+  try {
+    if (missingParams.length > 0) {
+      const strMissingParams = missingParams.join(", ");
+      return res.status(400).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Missing Parameter(s): ${strMissingParams}`,
+          },
+          parameters,
+        })
+      );
+    }
+
+    const _id = parameters._id;
+    const stage =
+      typeof parameters.stage === "string" ? parameters.stage : undefined;
+    const limit =
+      typeof parameters.limit === "string" ? parseInt(parameters.limit) : 0;
+    let format =
+      typeof parameters.format === "string" ? parameters.format : "csv";
+    switch (format) {
+      case "csv":
+      case "json":
+      case "xlsx":
+        break;
+      default:
+        return res.status(400).json(
+          toLogObject({
+            action,
+            response: {
+              error: `Invalid Format: ${format} (except csv,json,xlsx)`,
+            },
+            parameters,
+          })
+        );
+    }
+
+    const studentDoc = await StudentModel.findById(_id);
+
+    if (studentDoc === null) {
+      return res.status(404).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Student _id = '${_id}' Not found`,
+          },
+          parameters,
+        })
+      );
+    }
+
+    const filter = {
+      studentId: studentDoc._id,
+      countStatistic: true,
+    };
+    if (typeof stage === "string") {
+      filter.stage = stage;
+    }
+
+    let queryPromise = ScoreModel.find(filter).sort({ timestamp: -1 });
+    if (!isNaN(limit) && limit > 0) {
+      queryPromise = queryPromise.limit(limit);
+    }
+    const scoreArray = await queryPromise.exec();
+    if (format === "csv") {
+      const csvStr = await studentDocsToCSV(scoreArray);
+      const filename = `export-${studentDoc._id}-${Date.now()}.csv`;
+      res.attachment(filename);
+      res.status(200).send(csvStr);
+    } else if (format === "xlsx") {
+      const wb = studentDocsToXLSX(scoreArray);
+      const filename = `export-${studentDoc._id}-${Date.now()}.xlsx`;
+      wb.write(filename, res);
+    } else if (format === "json") {
+      const json = studentDocsToJSON(scoreArray);
+      res.status(200).json(
+        toLogObject({
+          action,
+          response: json,
+          parameters,
+        })
+      );
+    } else {
+      return res.status(400).json(
+        toLogObject({
+          action,
+          response: {
+            error: `Invalide Format: ${format} (except csv,xlsx)`,
+          },
+          parameters,
+        })
+      );
+    }
   } catch (err) {
     if (err.message.includes("Cast to ObjectId failed")) {
       res.status(400).json(
