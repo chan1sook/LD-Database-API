@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <%- include('includes/header', {title: "LD Report - เข้าสู่ระบบ"}); -%>
+    <script src="/public/bundle-login.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <%- include('includes/menu', {guest: true, activeLink: "login"}); -%>
+      <div class="container">
+        <div class="row">
+          <div class="col-12 col-md-9 col-ld-6 mx-auto">
+            <h1 class="my-2">เข้าสู่ระบบ</h1>
+            <form @submit.prevent="login">
+              <div class="mb-3">
+                <label class="form-label"> Username </label>
+                <input
+                  v-model="username"
+                  type="text"
+                  class="form-control"
+                  :class="{'is-valid': isUsernameValid, 'is-invalid': !isUsernameValid && username !== ''}"
+                  placeholder="Username"
+                  :disabled="loading"
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label"> รหัสผ่าน </label>
+                <div
+                  class="input-group"
+                  :class="{'is-valid': isPasswordValid, 'is-invalid': !isPasswordValid && password !== ''}"
+                >
+                  <input
+                    v-model="password"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="form-control"
+                    :class="{'is-valid': isPasswordValid, 'is-invalid': !isPasswordValid && password !== ''}"
+                    placeholder="รหัสผ่าน"
+                    required
+                    :disabled="loading"
+                  />
+                  <button
+                    v-tooltip="'ดูรหัสผ่าน'"
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    @click="showPassword = !showPassword"
+                  >
+                    <i v-if="showPassword" class="fas fa-eye-slash fa-fw"></i>
+                    <i v-else class="fas fa-eye fa-fw"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="mb-3 text-center">
+                <button type="reset" class="btn btn-danger" :disabled="loading">
+                  ล้าง
+                </button>
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  :disabled="loading || !isValid"
+                >
+                  เข้าสู่ระบบ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        <b-toast ref="errorToast" class="bg-danger">
+          เข้าสู่ระบบไม่สำเร็จ
+        </b-toast>
+      </div>
+    </div>
+  </body>
+</html>

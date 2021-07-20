@@ -1,33 +1,41 @@
-const dotenv = require("dotenv");
-const express = require("express");
-const compression = require("compression");
-const mongoose = require("mongoose");
+const path = require("path");
 
-dotenv.config();
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const compression = require("compression");
+const mongodb = require("./middlewares/mongodb");
+const session = require("./middlewares/session");
+const showlog = require("./middlewares/showlog");
+const { toLogObject } = require("./utils/utils");
+
 const port = process.env.PORT || 3000;
 const app = express();
 
-const dbName = process.env.DB_NAME || "test";
+mongodb().catch(console.error);
 
-mongoose.connect(`mongodb://localhost/${dbName}`, {
-  useUnifiedTopology: true,
-  useNewUrlParser: true,
-  useCreateIndex: true,
-});
+app.set("view engine", "ejs");
 
 if (process.env.NODE_ENV === "production") {
   app.use(compression());
 }
+app.use(session);
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(showlog(true));
 
-const studentRouter = require("./routes/student");
+const userRouter = require("./routes/user");
 const scoreRouter = require("./routes/score");
+const reportRouter = require("./routes/report");
 
-app.use(studentRouter);
+app.use("/public", express.static(path.join(__dirname, "public")));
+
+app.use(userRouter);
 app.use(scoreRouter);
+app.use(reportRouter);
 
-const { toLogObject } = require("./utils");
 app.use("*", (req, res) => {
   return res.status(404).json(
     toLogObject({

@@ -1,0 +1,53 @@
+<% if(typeof activeLink === "undefined") { let activeLink = undefined; } %> 
+<nav class="navbar navbar-expand-md navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">LD Report</a>
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#navbarNav"
+      aria-controls="navbarNav"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <% if(typeof username !== "undefined") { %>
+    <span class="d-md-none navbar-text py-1">
+      <img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp" height="28">
+      <%= username %>
+    </span>
+    <% } %>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <span class="flex-grow-1"></span>
+      <% if(typeof username !== "undefined") { %>
+      <span class="d-none d-md-block navbar-text py-1 me-2">
+        <img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp" height="28">
+        <%= username %>
+      </span>
+      <% } %>
+      <ul class="navbar-nav">
+        <% if(guest) { %>
+        <li class="nav-item">
+          <a class="nav-link <%= activeLink == "register" ? 'active' : '' %>" href="/report/register">
+            ลงทะเบียน
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <%= activeLink == "login" ? 'active' : '' %>" href="/report/login">
+            เข้าสู่ระบบ
+          </a>
+        </li>
+        <% } else { %>
+          <li class="nav-item">
+            <a class="nav-link <%= activeLink == "report" ? 'active' : '' %>" href="/report">รายงาน</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" @click.prevent="logout">ออกจากระบบ</a>
+          </li>
+        <% } %> 
+      </ul>
+    </div>
+  </div>
+</nav>

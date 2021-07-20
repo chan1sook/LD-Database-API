@@ -1,61 +1,27 @@
 const csv = require("csv");
 const excel4node = require("excel4node");
 
-module.exports.toLogObject = function ({
-  timestamp = Date.now(),
-  action = "default",
-  response,
-  parameters,
-}) {
-  return {
-    timestamp,
-    action,
-    parameters,
-    response,
-  };
-};
-
-module.exports.filterParams = function (obj, params, optionalParams = []) {
-  const result = {};
-  for (const param of params) {
-    result[param] = obj[param];
-  }
-  for (const param of optionalParams) {
-    result[param] = obj[param];
-  }
-  return result;
-};
-
-module.exports.checkMissingParams = function (
-  obj,
-  params,
-  optionalParams = []
-) {
-  const missingParams = [];
-  for (const param of params) {
-    if (typeof obj[param] === "undefined" && !optionalParams.includes(param)) {
-      missingParams.push(param);
-    }
-  }
-  return missingParams;
-};
-
 const studentsExportColumns = [
   "timestamp",
   "datetime",
+  "firstName",
+  "lastName",
+  "gender",
+  "school",
+  "grade",
+  "room",
   "stage",
+  "playCount",
   "difficulty",
   "score",
-  "minParScore",
-  "maxParScore",
+  "maxScore",
   "duration",
-  "minParDuration",
-  "maxParDuration",
-  "scoreDifficultyFactor",
-  "durationDifficultyFactor",
-  "difficultyAdjustment",
+  "alphabets",
+  "answerCorrects",
+  "answerScores",
 ];
-module.exports.studentDocsToCSV = function (scoreDocs) {
+
+module.exports.scoresToCSV = function (scoreDocs) {
   return new Promise((resolve, reject) => {
     let csvStr = "";
     const stringify = csv.stringify({
@@ -75,22 +41,15 @@ module.exports.studentDocsToCSV = function (scoreDocs) {
     stringify.on("finish", () => {
       resolve(csvStr);
     });
-    for (const doc of scoreDocs) {
-      const result = doc.toJSON();
-      result.difficultyAdjustment = doc.difficultyAdjustment;
-      result.nextDifficulty = doc.nextDifficulty;
+    for (const result of scoreDocs) {
       result.datetime = new Date(result.timestamp).toISOString();
-      const deleteParams = ["studentId", "_id", "__v", "countStatistic"];
-      for (const param of deleteParams) {
-        delete result[param];
-      }
       stringify.write(result);
     }
     stringify.end();
   });
 };
 
-module.exports.studentDocsToXLSX = function (scoreDocs) {
+module.exports.scoresToXLSX = function (scoreDocs) {
   const wb = new excel4node.Workbook();
   const ws = wb.addWorksheet("Export Data");
   const headerStyle = wb.createStyle({
@@ -109,18 +68,16 @@ module.exports.studentDocsToXLSX = function (scoreDocs) {
   ws.column(1).setWidth(15);
   ws.column(2).setWidth(15);
   ws.column(3).setWidth(20);
+  ws.column(4).setWidth(20);
+  ws.column(6).setWidth(20);
 
   const normalStyle = wb.createStyle({
     font: {
       size: 12,
     },
   });
-  for (const doc of scoreDocs) {
-    const result = doc.toJSON();
-    result.difficultyAdjustment = doc.difficultyAdjustment;
-    result.nextDifficulty = doc.nextDifficulty;
+  for (const result of scoreDocs) {
     result.datetime = new Date(result.timestamp).toISOString();
-    const deleteParams = ["studentId", "_id", "__v", "countStatistic"];
     for (const param of deleteParams) {
       delete result[param];
     }
@@ -145,10 +102,20 @@ module.exports.studentDocsToXLSX = function (scoreDocs) {
                 },
                 numberFormat: "0",
               });
-          } else {
+          } else if (Array.isArray(result[header])) {
+            ws.cell(row, column)
+              .string(result[header].join(","))
+              .style(normalStyle);
+          } else if (typeof result[header] === "object") {
+            ws.cell(row, column)
+              .string(JSON.stringify(result[header]))
+              .style(normalStyle);
+          } else if (result[header]) {
             ws.cell(row, column)
               .string("" + result[header])
               .style(normalStyle);
+          } else {
+            ws.cell(row, column).string("").style(normalStyle);
           }
       }
       column += 1;
@@ -156,16 +123,4 @@ module.exports.studentDocsToXLSX = function (scoreDocs) {
   }
 
   return wb;
-};
-
-module.exports.studentDocsToJSON = function (scoreDocs) {
-  return scoreDocs.map((doc) => {
-    const result = doc.toJSON();
-    result.difficultyAdjustment = doc.difficultyAdjustment;
-    const deleteParams = ["studentId", "_id", "__v", "countStatistic"];
-    for (const param of deleteParams) {
-      delete result[param];
-    }
-    return result;
-  });
 };

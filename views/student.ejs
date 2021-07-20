@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <%- include('includes/header', {title: "LD Report - รายงาน"}); -%>
+    <script>
+      const STUDENT_ID = "<%= _id %>";
+    </script>
+    <script src="/public/bundle-student.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <%- include('includes/menu', {guest: false, activeLink: "report"}); -%>
+      <div class="container">
+        <div class="my-2 d-flex flex-row align-items-center">
+          <h1 class="flex-grow-1">รายงานนักเรียน</h1>
+          <div>
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="loading"
+              @click="reloadData"
+              v-tooltip="'รีโหลด'"
+            >
+              <i class="fas fa-sync fa-fw"></i>
+            </button>
+            <a
+              :href="exportLink"
+              download
+              class="btn btn-success"
+              v-tooltip="'ส่งออกเป็น CSV'"
+            >
+              <i class="fas fa-file-csv fa-fw"></i>
+            </a>
+          </div>
+        </div>
+        <div v-if="loading" class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">รอสักครู่...</span>
+          </div>
+        </div>
+        <template v-else>
+          <h3 class="my-2">ชื่อ-สกุล: {{ student.fullname }}</h3>
+          <div class="my-2">
+            <b>โรงเรียน:</b> {{ student.school }} <b>ชั้นเรียน:</b>
+            {{ student.grade }} <b>ห้อง:</b> {{ student.room }} <b>เพศ:</b>
+            <span v-if="student.gender === 'male'">ชาย</span>
+            <span v-else-if="student.gender === 'female'">หญิง</span>
+            <span v-else>อื่นๆ</span>
+          </div>
+          <table class="table table-sm table-bordered">
+            <thead>
+              <th colspan="2" class="align-middle">ด่าน</th>
+              <th class="text-center align-middle">ครั้งที่</th>
+              <th class="text-center align-middle">วันที่</th>
+              <th class="text-center align-middle">คะแนนที่ได้</th>
+              <th class="text-center align-middle">เวลาที่ใช้ (วินาที)</th>
+            </thead>
+            <tbody>
+              <tr v-for="(score, i) of scores" :key="i">
+                <th
+                  v-if="score.rowspanStage"
+                  class="align-middle"
+                  :rowspan="score.rowspanStage"
+                >
+                  {{ score.stage }}
+                </th>
+                <td
+                  v-if="score.rowspanSubstage"
+                  class="align-middle"
+                  :rowspan="score.rowspanSubstage"
+                >
+                  {{ score.substage }}
+                </td>
+                <td class="text-center align-middle">{{ score.count }}</td>
+                <td class="text-center align-middle">
+                  {{ score.date ? score.date : "-" }}
+                </td>
+                <td class="text-center align-middle">
+                  {{ score.score ? score.score : "-" }}
+                </td>
+                <td class="text-center align-middle">
+                  {{ score.duration ? score.duration : "-" }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </div>
+      <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        <b-toast ref="errorToast" class="bg-danger">
+          ออกจากระบบไม่สำเร็จ
+        </b-toast>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,137 +1,366 @@
 const express = require("express");
-const { toLogObject, filterParams, checkMissingParams } = require("../utils");
-const StudentModel = require("../models/student");
+const { toLogObject } = require("../utils/utils");
+const checkparams = require("../middlewares/checkparams");
+const UserModel = require("../models/user");
 const ScoreModel = require("../models/score");
+const { scoresToCSV, scoresToXLSX } = require("../utils/data-transform");
+const {
+  fetchStudentId,
+  fetchStudents,
+  fetchScoresByStudentId,
+  fetchScoresByStudents,
+} = require("../utils/fetch");
+const { StudentsData } = require("../utils/student-data");
 const router = express.Router();
 
 /**
  * Post Score to Database
  */
-router.post("/score", async (req, res) => {
-  const action = `${req.method} ${req.path}`;
-  const params = [
-    "_id",
-    "stage",
-    "minParScore",
-    "maxParScore",
-    "score",
-    "minParDuration",
-    "maxParDuration",
-    "duration",
-    "difficulty",
-    "scoreDifficultyFactor",
-    "durationDifficultyFactor",
-  ];
-  const optionalParams = ["stage"];
-  const parameters = filterParams(req.body, params, optionalParams);
-  const missingParams = checkMissingParams(req.body, params, optionalParams);
+router.put(
+  "/score",
+  checkparams(
+    "body",
+    ["stage", "score", "maxScore", "duration", "difficulty"],
+    ["alphabets", "answerCorrects", "answerScores"]
+  ),
+  async (req, res) => {
+    try {
+      if (
+        !req.session ||
+        !req.session.user ||
+        req.session.user.role !== "student"
+      ) {
+        return res.status(403).json(
+          toLogObject({
+            action: `${req.method} ${req.path}`,
+            response: {
+              error: "Forbidden",
+            },
+            parameters: req.parameters,
+          })
+        );
+      }
 
-  try {
-    if (missingParams.length > 0) {
-      const strMissingParams = missingParams.join(", ");
-      return res.status(400).json(
+      const _id = req.session.user._id;
+      const userDoc = await UserModel.findById(_id);
+      if (userDoc === null) {
+        return res.status(500).json(
+          toLogObject({
+            action: `${req.method} ${req.path}`,
+            response: {
+              error: `Please login again!`,
+            },
+            parameters: req.parameters,
+          })
+        );
+      }
+
+      const stage = req.parameters.stage;
+      const score = req.parameters.score;
+      const maxScore = req.parameters.maxScore;
+      const duration = req.parameters.duration;
+      const difficulty = req.parameters.difficulty;
+      const alphabets = req.parameters.alphabets || [];
+      const answerCorrects = req.parameters.answerCorrects || [];
+      const answerScores = req.parameters.answerScores || [];
+
+      const scoreDoc = new ScoreModel({
+        studentId: userDoc._id,
+        stage,
+        score,
+        maxScore,
+        duration,
+        difficulty,
+        alphabets,
+        answerCorrects,
+        answerScores,
+      });
+      await scoreDoc.save();
+
+      const response = scoreDoc.toJSON();
+      const deleteParams = ["countStatistic"];
+      for (const param of deleteParams) {
+        delete response[param];
+      }
+
+      res.status(200).json(
         toLogObject({
-          action,
+          action: `${req.method} ${req.path}`,
+          response,
+          parameters: req.parameters,
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(
+        toLogObject({
+          action: `${req.method} ${req.path}`,
           response: {
-            error: `Missing Parameter(s): ${strMissingParams}`,
+            error: "Server Error",
+            rawError: err.toString(),
           },
-          parameters,
+          parameters: req.parameters,
         })
       );
     }
+  }
+);
 
-    const minParScore = parameters.minParScore;
-    const maxParScore = parameters.maxParScore;
-    if (minParScore > maxParScore) {
-      return res.status(400).json(
+/**
+ * Get Scores
+ */
+router.get(
+  "/scores",
+  checkparams("query", [], ["school", "room", "grade", "_id"]),
+  async (req, res) => {
+    try {
+      if (!req.session || !req.session.user) {
+        return res.status(403).json(
+          toLogObject({
+            action: `${req.method} ${req.path}`,
+            response: {
+              error: "Forbidden",
+            },
+            parameters: req.parameters,
+          })
+        );
+      }
+
+      let studentDocs;
+      switch (req.session.user.role) {
+        case "student":
+          studentDocs = await fetchStudentId(req.session.user._id);
+          break;
+        case "teacher":
+          if (typeof req.parameters._id !== "undefined") {
+            studentDocs = await fetchStudentId(req.parameters._id);
+            if (studentDocs.length < 1) {
+              return res.status(404).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Student _id not Found",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            } else if (req.session.user.school !== studentDocs[0].school) {
+              return res.status(403).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Forbidden",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            }
+          } else {
+            studentDocs = await fetchStudents(
+              req.session.user.school,
+              req.parameters.room,
+              req.parameters.grade
+            );
+          }
+          break;
+        case "school":
+        case "admin":
+          if (typeof req.parameters._id !== "undefined") {
+            studentDocs = await fetchStudentId(req.parameters._id);
+            if (studentDocs.length < 1) {
+              return res.status(404).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Student _id not Found",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            }
+          } else {
+            studentDocs = await fetchStudents(
+              req.parameters.school,
+              req.parameters.room,
+              req.parameters.grade
+            );
+          }
+          break;
+        default:
+          return res.status(403).json(
+            toLogObject({
+              action: `${req.method} ${req.path}`,
+              response: {
+                error: "Forbidden",
+              },
+              parameters: req.parameters,
+            })
+          );
+      }
+
+      res.status(200).json(
         toLogObject({
-          action,
+          action: `${req.method} ${req.path}`,
+          response: studentDocs,
+          parameters: req.parameters,
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(
+        toLogObject({
+          action: `${req.method} ${req.path}`,
           response: {
-            error: `maxParScore must be greater or equal (>=) minParScore`,
+            error: "Server Error",
+            rawError: err.toString(),
           },
-          parameters,
+          parameters: req.parameters,
         })
       );
     }
+  }
+);
 
-    const _id = parameters._id;
+/**
+ * Export Scores
+ */
+router.get(
+  "/export",
+  checkparams("query", [], ["format", "school", "room", "grade", "_id"]),
+  async (req, res) => {
+    try {
+      let format =
+        typeof req.parameters.format === "string"
+          ? req.parameters.format
+          : "csv";
+      if (!["csv", "json", "xlsx"].includes(format)) {
+        return res.status(400).json(
+          toLogObject({
+            action: `${req.method} ${req.path}`,
+            response: {
+              error: `Invalid Format: ${format} (except csv,json,xlsx)`,
+            },
+            parameters: req.parameters,
+          })
+        );
+      }
 
-    const studentDoc = await StudentModel.findById(_id);
-    if (studentDoc === null) {
-      return res.status(404).json(
-        toLogObject({
-          action,
-          response: {
-            error: `Student _id = '${_id}' Not found`,
-          },
-          parameters,
-        })
-      );
-    }
+      let studentDocs;
+      switch (req.session.user.role) {
+        case "student":
+          studentDocs = await fetchStudentId(req.session.user._id);
+          break;
+        case "teacher":
+          if (typeof req.parameters._id !== "undefined") {
+            studentDocs = await fetchStudentId(req.parameters._id);
+            if (studentDocs.length < 1) {
+              return res.status(404).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Student _id not Found",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            } else if (req.session.user.school !== studentDocs[0].school) {
+              return res.status(403).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Forbidden",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            }
+          } else {
+            studentDocs = await fetchStudents(
+              req.session.user.school,
+              req.parameters.room,
+              req.parameters.grade
+            );
+          }
+          break;
+        case "school":
+        case "admin":
+          if (typeof req.parameters._id !== "undefined") {
+            studentDocs = await fetchStudentId(req.parameters._id);
+            if (studentDocs.length < 1) {
+              return res.status(404).json(
+                toLogObject({
+                  action: `${req.method} ${req.path}`,
+                  response: {
+                    error: "Student _id not Found",
+                  },
+                  parameters: req.parameters,
+                })
+              );
+            }
+          } else {
+            studentDocs = await fetchStudents(
+              req.parameters.school,
+              req.parameters.room,
+              req.parameters.grade
+            );
+          }
+          break;
+        default:
+          return res.status(403).json(
+            toLogObject({
+              action: `${req.method} ${req.path}`,
+              response: {
+                error: "Forbidden",
+              },
+              parameters: req.parameters,
+            })
+          );
+      }
 
-    const stage = parameters.stage;
-    const score = parameters.score;
-    const minParDuration = parameters.minParDuration;
-    const maxParDuration = parameters.maxParDuration;
-    if (minParDuration > maxParDuration) {
-      return res.status(400).json(
-        toLogObject({
-          action,
-          response: {
-            error: `maxParDuration must be greater or equal (>=) minParDuration`,
-          },
-          parameters,
-        })
-      );
-    }
+      studentDocs = new StudentsData(studentDocs);
 
-    const duration = parameters.duration;
-    const difficulty = parameters.difficulty;
-    const scoreDifficultyFactor = parameters.scoreDifficultyFactor;
-    const durationDifficultyFactor = parameters.durationDifficultyFactor;
+      const scoreDocs = studentDocs.students.reduce((arr, student) => {
+        const stageGroupScores = student.stageGroupScores.reduce((arr, ele) => {
+          const substageScores = ele.substages.reduce((arr, ele) => {
+            return arr.concat(
+              ele.scores.map((ele, i) => {
+                return {
+                  ...ele,
+                  firstName: student.firstName,
+                  lastName: student.lastName,
+                  gender: student.gender,
+                  school: student.school,
+                  grade: student.grade,
+                  room: student.room,
+                  playCount: i + 1,
+                };
+              })
+            );
+          }, []);
+          return arr.concat(substageScores);
+        }, []);
+        return arr.concat(stageGroupScores);
+      }, []);
 
-    const scoreDoc = new ScoreModel({
-      studentId: studentDoc._id,
-      stage,
-      minParScore,
-      maxParScore,
-      score,
-      minParDuration,
-      maxParDuration,
-      duration,
-      difficulty,
-      scoreDifficultyFactor,
-      durationDifficultyFactor,
-    });
-    await scoreDoc.save();
-
-    const response = scoreDoc.toJSON();
-    response.difficultyAdjustment = scoreDoc.difficultyAdjustment;
-    response.nextDifficulty = scoreDoc.nextDifficulty;
-    const deleteParams = ["studentId", "_id", "__v", "countStatistic"];
-    for (const param of deleteParams) {
-      delete response[param];
-    }
-
-    res.status(200).json(
-      toLogObject({
-        action,
-        response,
-        parameters,
-      })
-    );
-  } catch (err) {
-    if (err.message.includes("Cast to ObjectId failed")) {
-      res.status(400).json(
-        toLogObject({
-          action,
-          response: {
-            error: `Student _id = '${parameters._id}' Not found`,
-          },
-          parameters,
-        })
-      );
-    } else {
+      let filename;
+      switch (format) {
+        case "csv":
+          filename = `export-${Date.now()}.csv`;
+          const csvStr = await scoresToCSV(scoreDocs);
+          res.attachment(filename);
+          res.status(200).send(csvStr);
+          break;
+        case "xlsx":
+          filename = `export-${Date.now()}.xlsx`;
+          const wb = scoresToXLSX(scoreArray);
+          wb.write(filename, res);
+          break;
+        case "json":
+        default:
+          res.status(200).json(scoreDocs);
+          break;
+      }
+    } catch (err) {
       console.error(err);
       res.status(500).json(
         toLogObject({
@@ -140,11 +369,11 @@ router.post("/score", async (req, res) => {
             error: "Server Error",
             rawError: err.toString(),
           },
-          parameters,
+          parameters: req.parameters,
         })
       );
     }
   }
-});
+);
 
 module.exports = router;
