@@ -2,14 +2,14 @@ require("colors");
 
 module.exports = (showLog = false) => {
   return (req, res, next) => {
+    console.log(`[${req.method}]`.yellow + ` ${req.path}`);
     if (showLog) {
-      console.log(`[${req.method}]`.yellow + ` ${req.path}`);
       const queryLog = JSON.stringify(req.query);
       if (queryLog !== "{}") {
         console.log(`[Query]`.green + ` ${queryLog}`);
       }
       const bodyLog = JSON.stringify(req.body);
-      if (bodyLog !== "{}") {
+      if (typeof bodyLog !== "undefined" && bodyLog !== "{}") {
         console.log(`[Body]`.green + ` ${bodyLog}`);
       }
       const paramLog = JSON.stringify(req.params);

@@ -5,8 +5,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
-const mongodb = require("./middlewares/mongodb");
-const session = require("./middlewares/session");
+const mongodb = require("./configurations/mongodb");
+const session = require("./configurations/session");
 const showlog = require("./middlewares/showlog");
 const { toLogObject } = require("./utils/utils");
 
@@ -17,6 +17,7 @@ mongodb().catch(console.error);
 
 app.set("view engine", "ejs");
 
+app.use(showlog(process.env.NODE_ENV === "production"));
 if (process.env.NODE_ENV === "production") {
   app.use(compression());
 }
@@ -24,7 +25,6 @@ app.use(session);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(showlog(true));
 
 const userRouter = require("./routes/user");
 const scoreRouter = require("./routes/score");
