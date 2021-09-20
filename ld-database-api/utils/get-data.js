@@ -483,6 +483,51 @@ function textColor(percentile) {
   return COLOR_GRADIENTS.hsvAt(t).isDark() ? "#FFFFFF" : "#212529";
 }
 
+const thaiAlphabets = [
+  "ก",
+  "ข",
+  "ค",
+  "ฆ",
+  "ง",
+  "จ",
+  "ฉ",
+  "ช",
+  "ซ",
+  "ฌ",
+  "ญ",
+  "ฎ",
+  "ฏ",
+  "ฐ",
+  "ฑ",
+  "ฒ",
+  "ณ",
+  "ด",
+  "ต",
+  "ถ",
+  "ท",
+  "ธ",
+  "น",
+  "บ",
+  "ป",
+  "ผ",
+  "ฝ",
+  "พ",
+  "ฟ",
+  "ภ",
+  "ม",
+  "ย",
+  "ร",
+  "ล",
+  "ว",
+  "ศ",
+  "ษ",
+  "ส",
+  "ห",
+  "ฬ",
+  "อ",
+  "ฮ",
+];
+
 async function getSummaryScores(
   userData,
   {
@@ -628,6 +673,50 @@ async function getSummaryScores(
       studentData.firstPlay = new Date(Math.min(...timestamps));
       studentData.lastPlay = new Date(Math.max(...timestamps));
     }
+
+    const stages = studentData.stageScores.filter((ele) =>
+      /^\d/.test(ele.stage)
+    );
+    const questions = stages.reduce(
+      (result, ele) => result.concat(ele.questions),
+      []
+    );
+
+    studentData.alphabetsStats = thaiAlphabets.map((alphabet) => {
+      const filterAlphabets = questions.filter(
+        (question) => question.questionAlphabet === alphabet
+      );
+
+      return {
+        alphabet,
+        counts: filterAlphabets.length,
+        corrects: filterAlphabets.filter((question) => question.isCorrect)
+          .length,
+        wrongs: filterAlphabets.filter((question) => !question.isCorrect)
+          .length,
+      };
+    });
+
+    const maxCorrectCounts = Math.max(
+      ...studentData.alphabetsStats.map((ele) => ele.corrects)
+    );
+    const maxWrongCounts = Math.max(
+      ...studentData.alphabetsStats.map((ele) => ele.wrongs)
+    );
+
+    studentData.mostCorrectAlphabets = {
+      alphabets: studentData.alphabetsStats
+        .filter((ele) => ele.corrects > 0 && ele.corrects === maxCorrectCounts)
+        .map((ele) => ele.alphabet),
+      counts: maxCorrectCounts,
+    };
+
+    studentData.mostWrongAlphabets = {
+      alphabets: studentData.alphabetsStats
+        .filter((ele) => ele.wrongs > 0 && ele.corrects === maxWrongCounts)
+        .map((ele) => ele.alphabet),
+      counts: maxWrongCounts,
+    };
   }
 
   for (let i = 1; i <= 9; i++) {

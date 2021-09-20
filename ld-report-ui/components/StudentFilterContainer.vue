@@ -2,7 +2,7 @@
   <div class="grid grid-flow-row grid-cols-12 gap-2 items-center">
     <span class="col-span-2 md:col-span-1 text-center">โรงเรียน</span>
     <VueSelect
-      :value="value.student || null"
+      :value="isValueNotNull(value.student) ? value.student : null"
       :disabled="role === 'teacher'"
       class="col-span-10 md:col-span-5 lg:col-span-3"
       :reduce="(option) => option.value"
@@ -12,7 +12,7 @@
     />
     <span class="col-span-2 md:col-span-1 text-center">ชั้นเรียน</span>
     <VueSelect
-      :value="value.grade || null"
+      :value="isValueNotNull(value.grade) ? value.grade : null"
       class="col-span-10 md:col-span-5 lg:col-span-3"
       :reduce="(option) => option.value"
       :options="gradeOptions"
@@ -21,7 +21,7 @@
     />
     <span class="col-span-2 md:col-span-1 text-center">ห้อง</span>
     <VueSelect
-      :value="value.room || null"
+      :value="isValueNotNull(value.room) ? value.room : null"
       class="col-span-10 md:col-span-5 lg:col-span-3"
       :reduce="(option) => option.value"
       :options="roomOptions"
@@ -95,6 +95,9 @@ export default {
     },
   },
   methods: {
+    isValueNotNull(value) {
+      return value !== null && typeof value !== 'undefined'
+    },
     emitInput(type, value) {
       const emitData = Object.assign(Object.assign({}, this.value), {
         [type]: value,

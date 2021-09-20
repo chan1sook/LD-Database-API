@@ -22,7 +22,7 @@ const UserSchema = new mongoose.Schema({
     stageInfo: [
       {
         stage: { type: String, required: true },
-        star: { type: Number, min: 0, max: 5, required: true },
+        star: { type: Number, required: true },
       },
     ],
     bossAlphabets: [

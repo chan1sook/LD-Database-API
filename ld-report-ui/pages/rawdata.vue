@@ -3,7 +3,7 @@
     class="
       flex flex-col
       items-center
-      justify-center
+      justify-start
       py-4
       px-4
       sm:px-6
@@ -11,7 +11,6 @@
       relative
     "
   >
-    <LoadingOverlay v-if="$fetchState.pending" class="rounded-lg" />
     <div
       class="
         w-full
@@ -26,11 +25,16 @@
         <h2 class="text-center text-3xl font-bold">ข้อมูลดิบ</h2>
         <div class="absolute right-0 top-1/2 transform -translate-y-1/2">
           <AppButton
-            class="absolute right-0 w-10 h-10 rounded-full"
+            class="w-10 h-10 rounded-full"
             alt="Refresh"
+            :disabled="$fetchState.pending"
             @click="$fetch"
           >
-            <FontAwesomeIcon :icon="['fas', 'sync']" fixed-width />
+            <FontAwesomeIcon
+              :icon="['fas', 'sync']"
+              :spin="$fetchState.pending"
+              fixed-width
+            />
           </AppButton>
         </div>
       </div>
@@ -99,11 +103,7 @@
           </template>
         </AppDropdown>
       </div>
-      <div
-        ref="tabulator-stage"
-        class="w-full border"
-        style="height: 300px"
-      ></div>
+      <div ref="tabulator-stage" class="h-tabulator w-full border"></div>
       <div class="flex flex-row items-center">
         <div class="flex-1 font-bold text-2xl">ด่านบอส</div>
         <AppDropdown>
@@ -163,11 +163,7 @@
           </template>
         </AppDropdown>
       </div>
-      <div
-        ref="tabulator-boss"
-        class="w-full border"
-        style="height: 300px"
-      ></div>
+      <div ref="tabulator-boss" class="h-tabulator w-full border"></div>
     </div>
   </div>
 </template>
@@ -179,21 +175,19 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/th'
 import buddhistEra from 'dayjs/plugin/buddhistEra'
 
-import LoadingOverlay from '~/components/LoadingOverlay.vue'
 import StudentFilterContainer from '~/components/StudentFilterContainer.vue'
 
 const DATA_PER_CHUNK = 200
-const STUDENT_PER_CHUNK = 50
+const STUDENT_PER_CHUNK = 10
 
 dayjs.extend(buddhistEra)
 
 export default {
   components: {
-    LoadingOverlay,
     StudentFilterContainer,
   },
   middleware({ route, store, redirect }) {
-    if (!['admin', 'expert'].includes(store.getters.role)) {
+    if (!['admin', 'expert', 'teacher'].includes(store.getters.role)) {
       return redirect('/')
     }
   },
@@ -208,16 +202,11 @@ export default {
     }
   },
   async fetch() {
-    await this.fetchStageData()
-    await this.fetchBossData()
-    await this.fetchStudentData()
-
-    if (this.tableStage) {
-      this.tableStage.replaceData(this.stageData)
-    }
-    if (this.tableBoss) {
-      this.tableBoss.replaceData(this.bossData)
-    }
+    await Promise.all([
+      this.fetchStageData(),
+      this.fetchBossData(),
+      this.fetchStudentData(),
+    ])
   },
   head: {
     title: 'LD Report - ข้อมูลดิบ',
@@ -273,7 +262,6 @@ export default {
       this.tableStage = new Tabulator(this.$refs['tabulator-stage'], {
         data: this.stageData,
         layout: 'fitData',
-        height: '300px',
         columns: [
           'timestamp',
           'datetime',
@@ -306,7 +294,6 @@ export default {
       this.tableBoss = new Tabulator(this.$refs['tabulator-boss'], {
         data: this.bossData,
         layout: 'fitData',
-        height: '300px',
         columns: [
           'timestamp',
           'datetime',
@@ -355,6 +342,14 @@ export default {
             name: 'prevIdStart',
             value: prevIdStart,
           },
+          {
+            name: 'flattenStudent',
+            value: true,
+          },
+          {
+            name: 'flattenQuestion',
+            value: true,
+          },
         ]
           .filter((ele) => Boolean(ele.value))
           .map((ele) => `${ele.name}=${ele.value}`)
@@ -369,7 +364,9 @@ export default {
 
         this.stageData.push(...response.data)
 
-        // console.log(this.stageData.length, hasNext, prevIdStart)
+        if (this.tableStage) {
+          this.tableStage.replaceData(this.stageData)
+        }
       }
     },
     async fetchBossData() {
@@ -388,6 +385,14 @@ export default {
             name: 'prevIdStart',
             value: prevIdStart,
           },
+          {
+            name: 'flattenStudent',
+            value: true,
+          },
+          {
+            name: 'flattenQuestion',
+            value: true,
+          },
         ]
           .filter((ele) => Boolean(ele.value))
           .map((ele) => `${ele.name}=${ele.value}`)
@@ -400,9 +405,11 @@ export default {
           prevIdStart = response.data[response.data.length - 1]._id
         }
 
-        this.stageData.push(...response.data)
+        this.bossData.push(...response.data)
 
-        // console.log(this.bossData.length, hasNext, prevIdStart)
+        if (this.tableBoss) {
+          this.tableBoss.replaceData(this.bossData)
+        }
       }
     },
     async fetchStudentData() {
@@ -434,8 +441,6 @@ export default {
         }
 
         this.studentDocs.push(...response.students)
-
-        // console.log(this.studentDocs.length, hasNext, prevIdStart)
       }
     },
     link(type, format) {

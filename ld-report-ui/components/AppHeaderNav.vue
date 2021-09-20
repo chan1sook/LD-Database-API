@@ -100,6 +100,31 @@
                       หน้าหลัก
                     </button>
                   </NuxtLink>
+                  <NuxtLink
+                    v-if="
+                      ['admin', 'expert', 'teacher'].includes(
+                        $store.getters.role
+                      )
+                    "
+                    to="/rawdata"
+                  >
+                    <button
+                      type="button"
+                      class="
+                        block
+                        px-4
+                        py-2
+                        w-full
+                        text-left text-sm text-gray-700
+                        hover:bg-gray-100
+                        active:bg-gray-200
+                      "
+                      role="menuitem"
+                      tabindex="-1"
+                    >
+                      ข้อมูลดิบ
+                    </button>
+                  </NuxtLink>
                   <div style="height: 1px" class="w-full bg-gray-200"></div>
                   <NuxtLink to="/userinfo">
                     <button
@@ -261,6 +286,33 @@
               "
             >
               หน้าหลัก
+            </a>
+            <a
+              v-if="
+                ['admin', 'expert', 'teacher'].includes($store.getters.role)
+              "
+              href="/rawdata"
+              class="
+                transition
+                duration-200
+                block
+                px-3
+                py-2
+                rounded-md
+                text-base
+                font-medium
+              "
+              :class="
+                currentRoute === '/'
+                  ? ['bg-indigo-700', 'text-white']
+                  : [
+                      'hover:bg-indigo-500',
+                      'hover:text-white',
+                      'active:bg-indigo-700',
+                    ]
+              "
+            >
+              ข้อมูลดิบ
             </a>
             <a
               href="/userinfo"

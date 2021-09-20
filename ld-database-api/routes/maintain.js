@@ -3,15 +3,12 @@ const { toLogObject } = require("../utils/utils");
 
 const StageScoreModel = require("../models/stage-score");
 const StageQuestionModel = require("../models/stage-question");
-const BossScoreModel = require("../models/boss-score");
-const BossQuestionModel = require("../models/boss-question");
+
+const OldScoreModel = require("../models/old-score");
 
 const router = express.Router();
 
-/**
- * Fix Date Problem
- */
-router.post("/maintain/fix-date", async (req, res) => {
+router.post("/maintain/restore-score", async (req, res) => {
   try {
     if (
       !req.session ||
@@ -28,54 +25,92 @@ router.post("/maintain/fix-date", async (req, res) => {
         })
       );
     }
-    const filter = {
-      timestamp: {
-        $gte: new Date(2500, 1),
-      },
-    };
+
+    await Promise.all([
+      StageQuestionModel.deleteMany({ scoreId: null }),
+      StageScoreModel.deleteMany({
+        timestamp: {
+          $gte: new Date("2021-02-12T08:09:25.101Z"),
+          $lte: new Date("2021-09-14T01:47:48.222Z"),
+        },
+        difficulty: { $ne: 0 },
+      }),
+    ]);
 
     const response = {
-      fixedStageScores: 0,
-      fixedBossScores: 0,
-      fixedStageQuestions: 0,
-      fixedBossQuestions: 0,
+      fixedOldScores: 0,
+      insertedStageQuestions: 0,
     };
+    const oldScoreDocs = await OldScoreModel.find({});
+    const stageQuestionScores = [];
 
-    const problemStageScores = await StageScoreModel.find(filter);
-    problemStageScores.forEach((doc) => {
-      const oldDate = doc.timestamp.toISOString();
-      const newDate = "2021" + oldDate.substr(4);
-      doc.timestamp = new Date(newDate);
-    });
-    await StageScoreModel.bulkSave(problemStageScores);
-    response.fixedStageScores = problemStageScores.length;
+    const playCountTable = [];
+    const stageScoreDocs = oldScoreDocs.map((oldScore) => {
+      let targetPlayCount = playCountTable.find(
+        (ele) =>
+          ele.studentId === oldScore.studentId && ele.stage === oldScore.stage
+      );
+      if (!targetPlayCount) {
+        targetPlayCount = {
+          studentId: oldScore.studentId,
+          stage: oldScore.stage,
+          playCount: 0,
+        };
+        playCountTable.push(targetPlayCount);
+      }
+      targetPlayCount.playCount += 1;
 
-    const problemBossScores = await BossScoreModel.find(filter);
-    problemBossScores.forEach((doc) => {
-      const oldDate = doc.timestamp.toISOString();
-      const newDate = "2021" + oldDate.substr(4);
-      doc.timestamp = new Date(newDate);
-    });
-    await BossScoreModel.bulkSave(problemBossScores);
-    response.fixedBossScores = problemBossScores.length;
+      const starCount =
+        oldScore.alphabets.length > 0
+          ? Math.min(
+              Math.ceil((oldScore.score / oldScore.alphabets.length) * 5),
+              5
+            )
+          : 5;
 
-    const problemStageQuestions = await StageQuestionModel.find(filter);
-    problemStageQuestions.forEach((doc) => {
-      const oldDate = doc.timestamp.toISOString();
-      const newDate = "2021" + oldDate.substr(4);
-      doc.timestamp = new Date(newDate);
-    });
-    await StageQuestionModel.bulkSave(problemStageQuestions);
-    response.fixedStageQuestions = problemStageQuestions.length;
+      const stageScoreDoc = new StageScoreModel({
+        studentId: oldScore.studentId,
+        timestamp: oldScore.timestamp,
+        stage: oldScore.stage,
+        difficulty: oldScore.difficulty,
+        playCount: targetPlayCount.playCount,
+        score: oldScore.score,
+        maxScore: oldScore.maxScore || oldScore.score,
+        duration: oldScore.duration,
+        star: starCount,
+      });
 
-    const problemBossQuestions = await BossQuestionModel.find(filter);
-    problemBossQuestions.forEach((doc) => {
-      const oldDate = doc.timestamp.toISOString();
-      const newDate = "2021" + oldDate.substr(4);
-      doc.timestamp = new Date(newDate);
+      for (let i = 0; i < oldScore.alphabets.length; i++) {
+        // check alphabets
+        let alphabet = oldScore.alphabets[i];
+        if (/^\d/.test(alphabet) && Number.isInteger(Number(alphabet))) {
+          alphabet = String.fromCharCode(Number(alphabet));
+        }
+
+        stageQuestionScores.push(
+          new StageQuestionModel({
+            stageScoreId: stageScoreDoc._id,
+            questionNo: i + 1,
+            questionAlphabet: alphabet,
+            questionWord: alphabet,
+            answerAlphabet: alphabet,
+            answerDuration: oldScore.duration / oldScore.alphabets.length,
+            isCorrect: Boolean(oldScore.answerCorrects[i]),
+            score: Number(oldScore.answerScores[i]),
+          })
+        );
+      }
+
+      return stageScoreDoc;
     });
-    await BossQuestionModel.bulkSave(problemBossQuestions);
-    response.fixedBossQuestions = problemBossQuestions.length;
+
+    await Promise.all([
+      StageScoreModel.bulkSave(stageScoreDocs),
+      StageQuestionModel.bulkSave(stageQuestionScores),
+    ]);
+
+    response.fixedOldScores = stageScoreDocs.length;
+    response.insertedStageQuestions = stageQuestionScores.length;
 
     res.status(200).json(
       toLogObject({

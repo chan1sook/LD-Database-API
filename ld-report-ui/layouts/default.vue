@@ -15,6 +15,12 @@ export default {
 
 <style>
 @import url('~/node_modules/tabulator-tables/dist/css/tabulator.min.css');
+
+.h-tabulator {
+  height: 500px;
+  height: min(calc(100vh - 5rem), max(500px, 50vh));
+}
+
 .tabulator {
   @apply shadow transition duration-200;
   border-color: theme('colors.gray.300');

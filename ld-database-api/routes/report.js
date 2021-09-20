@@ -189,6 +189,8 @@ router.get(
       "stage",
       "prevIdStart",
       "limit",
+      "flattenStudent",
+      "flattenQuestion",
     ]
   ),
   async (req, res) => {
@@ -206,11 +208,7 @@ router.get(
       }
 
       const response = {
-        data: await getStageScores(req.session.user, {
-          ...req.parameters,
-          flattenStudent: true,
-          flattenQuestion: true,
-        }),
+        data: await getStageScores(req.session.user, req.parameters),
         hasNext: false,
       };
 
@@ -262,6 +260,8 @@ router.get(
       "stage",
       "prevIdStart",
       "limit",
+      "flattenStudent",
+      "flattenQuestion",
     ]
   ),
   async (req, res) => {
@@ -279,11 +279,7 @@ router.get(
       }
 
       const response = {
-        data: await getBossScores(req.session.user, {
-          ...req.parameters,
-          flattenStudent: true,
-          flattenQuestion: true,
-        }),
+        data: await getBossScores(req.session.user, req.parameters),
         hasNext: false,
       };
 

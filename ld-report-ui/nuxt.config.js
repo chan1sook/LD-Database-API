@@ -28,6 +28,8 @@ export default {
 
   // Plugins to run before rendering page: https://go.nuxtjs.dev/config-plugins
   plugins: [
+    '~/plugins/vuecomposition',
+    { src: '~/plugins/chartjs.js', ssr: false },
     '~/plugins/vueselect',
     '~/plugins/tabulator',
     '~/plugins/fontawesome',

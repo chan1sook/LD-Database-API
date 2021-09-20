@@ -1,0 +1,11 @@
+{
+  "folders": [
+	{
+		"path": "ld-database-api"
+	},
+	{
+		"path": "ld-report-ui"
+	}
+],
+  "settings": {}
+}

@@ -3,7 +3,7 @@
     class="
       flex flex-col
       items-center
-      justify-center
+      justify-start
       py-4
       px-4
       sm:px-6
@@ -11,7 +11,6 @@
       relative
     "
   >
-    <LoadingOverlay v-if="$fetchState.pending" class="rounded-lg" />
     <div
       class="
         w-full
@@ -27,8 +26,17 @@
       </div>
       <div class="flex flex-row items-center">
         <div class="flex-1 text-2xl font-bold">ภาพรวม</div>
-        <AppButton class="w-10 h-10 rounded-full" alt="Refresh" @click="$fetch">
-          <FontAwesomeIcon :icon="['fas', 'sync']" fixed-width />
+        <AppButton
+          class="w-10 h-10 rounded-full"
+          alt="Refresh"
+          :disabled="$fetchState.pending"
+          @click="$fetch"
+        >
+          <FontAwesomeIcon
+            :icon="['fas', 'sync']"
+            :spin="$fetchState.pending"
+            fixed-width
+          />
         </AppButton>
       </div>
       <div class="grid grid-flow-row grid-cols-12 gap-2">
@@ -51,10 +59,10 @@
             <span class="text-xl font-bold">ชื่อ-นามสกุล:</span>
             {{ userData.firstName }} {{ userData.lastName }}
           </div>
-          <div class="col-span-12 sm:col-span-6">
+          <div class="col-span-12 md:col-span-6">
             <span class="font-bold">เพศ:</span> {{ genderThai }}
           </div>
-          <div class="col-span-12">
+          <div class="col-span-12 md:col-span-6">
             <span class="font-bold">โรงเรียน:</span> {{ userData.school }}
           </div>
           <div
@@ -69,38 +77,74 @@
           >
             <span class="font-bold">ห้อง:</span> {{ userData.room }}
           </div>
-          <div class="col-span-12">
-            <span class="font-bold">เล่นครั้งแรก:</span>
-            {{
-              studentDocs.length > 0 && studentDocs[0].firstPlay
-                ? formatDate(studentDocs[0].firstPlay)
-                : '-'
-            }}
-          </div>
-          <div class="col-span-12">
-            <span class="font-bold">เล่นล่าสุด:</span>
-            {{
-              studentDocs.length > 0 && studentDocs[0].lastPlay
-                ? formatDate(studentDocs[0].lastPlay)
-                : '-'
-            }}
-          </div>
         </template>
       </div>
+      <template v-if="userData.role === 'student'">
+        <div class="flex flex-row items-center">
+          <div class="flex-1 text-2xl font-bold">สถิติ</div>
+        </div>
+        <div class="grid grid-flow-row grid-cols-12 gap-2">
+          <div class="col-span-12 md:col-span-6">
+            <span class="font-bold">เล่นครั้งแรก:</span>
+            {{ firstStudentStats.firstPlay }}
+          </div>
+          <div class="col-span-12 sm:col-span-6">
+            <span class="font-bold">เล่นล่าสุด:</span>
+            {{ firstStudentStats.lastPlay }}
+          </div>
+          <div class="col-span-12">
+            <span class="font-bold">ตัวอักษรที่ผิดมากที่สุด:</span>
+            <template
+              v-if="firstStudentStats.mostWrongAlphabets.alphabets.length > 0"
+            >
+              {{ firstStudentStats.mostWrongAlphabets.alphabets.join(', ') }}
+              ({{ firstStudentStats.mostWrongAlphabets.counts }} ครั้ง)
+            </template>
+            <template v-else>-</template>
+          </div>
+          <div class="col-span-12">
+            <span class="font-bold">ตัวอักษรที่ถูกมากที่สุด:</span>
+            <template
+              v-if="firstStudentStats.mostCorrectAlphabets.alphabets.length > 0"
+            >
+              {{ firstStudentStats.mostCorrectAlphabets.alphabets.join(', ') }}
+              ({{ firstStudentStats.mostCorrectAlphabets.counts }} ครั้ง)
+            </template>
+            <template v-else>-</template>
+          </div>
+          <div class="col-span-12">
+            <span class="font-bold">สถิติตัวอักษร</span>
+          </div>
+          <div class="col-span-12">
+            <client-only>
+              <BarChart v-bind="barChartProps" />
+            </client-only>
+          </div>
+          <div class="col-span-12">
+            <AppButton
+              class="px-4 py-2"
+              @click="showAlphabetGrid = !showAlphabetGrid"
+            >
+              ซ่อน/แสดง
+            </AppButton>
+          </div>
+          <div
+            v-for="stats of firstStudentStats.alphabetsStats"
+            v-show="showAlphabetGrid"
+            :key="stats.alphabet"
+            class="col-span-6 sm:col-span-4 sm:col-span-2 xl:col-span-2"
+          >
+            <span class="font-bold">{{ stats.alphabet }}:</span>
+            {{ stats.corrects }}/{{ stats.wrongs }}
+          </div>
+        </div>
+      </template>
       <div class="grid grid-flow-row grid-cols-12 gap-2 items-center">
         <h3 class="col-span-12 md:col-span-4 text-2xl font-bold">
           ข้อมูลนักเรียน
         </h3>
         <div class="col-span-12 md:col-span-8 gap-2 text-center md:text-right">
-          <!--
-          <NuxtLink to="/graph">
-            <AppButton class="px-4 py-2"> กราฟเปรียบเทียบ </AppButton>
-          </NuxtLink>
-          -->
-          <NuxtLink
-            v-if="['admin', 'expert'].includes(userData.role)"
-            to="/rawdata"
-          >
+          <NuxtLink to="/rawdata">
             <AppButton class="px-4 py-2">
               <FontAwesomeIcon :icon="['fas', 'database']" fixed-width />
               ข้อมูลดิบ
@@ -164,81 +208,132 @@
           </AppDropdown>
         </div>
       </div>
-      <template v-if="userData.role !== 'student'">
-        <div class="font-bold text-xl">ตัวกรอง</div>
-        <StudentFilterContainer
-          v-model="filters"
-          :role="$store.getters.role"
-          :students="studentDocs"
-        />
-      </template>
-      <div ref="tabulator-summary" class="w-full" style="height: 300px"></div>
+      <div class="font-bold text-xl">ตัวกรอง</div>
+      <StudentFilterContainer
+        v-model="filters"
+        :role="$store.getters.role"
+        :students="studentDocs"
+      />
+      <div ref="tabulator-summary" class="h-tabulator w-full border"></div>
     </div>
   </div>
 </template>
 
 <script>
+import { BarChart, useBarChart } from 'vue-chart-3'
+import { defineComponent, ref, computed } from '@vue/composition-api'
+
 import Tabulator from 'tabulator-tables'
 
 import dayjs from 'dayjs'
 import 'dayjs/locale/th'
 import buddhistEra from 'dayjs/plugin/buddhistEra'
 
-import LoadingOverlay from '~/components/LoadingOverlay.vue'
 import StudentFilterContainer from '~/components/StudentFilterContainer.vue'
 
 dayjs.extend(buddhistEra)
 
-const DATA_PER_CHUNK = 50
+const DATA_PER_CHUNK = 10
 
-export default {
+export default defineComponent({
   components: {
-    LoadingOverlay,
+    BarChart,
     StudentFilterContainer,
+  },
+  loading: {
+    continuous: true,
+  },
+  setup() {
+    const studentDocs = ref([])
+
+    function formatDate(date) {
+      return dayjs(date).locale('th').format('D MMMM พ.ศ. BBBB H:mm น.')
+    }
+
+    const firstStudentStats = computed(() => {
+      const result = {
+        firstPlay: '-',
+        lastPlay: '-',
+        alphabetsStats: [],
+        mostCorrectAlphabets: {
+          alphabets: [],
+          counts: 0,
+        },
+        mostWrongAlphabets: {
+          alphabets: [],
+          counts: 0,
+        },
+      }
+
+      const _studentDocs = studentDocs.value
+      if (_studentDocs.length > 0) {
+        if (_studentDocs[0].firstPlay) {
+          result.firstPlay = formatDate(_studentDocs[0].firstPlay)
+        }
+        if (_studentDocs[0].lastPlay) {
+          result.lastPlay = formatDate(_studentDocs[0].lastPlay)
+        }
+
+        result.alphabetsStats = _studentDocs[0].alphabetsStats
+        result.mostCorrectAlphabets = _studentDocs[0].mostCorrectAlphabets
+        result.mostWrongAlphabets = _studentDocs[0].mostWrongAlphabets
+      }
+
+      return result
+    })
+    const options = computed(() => ({
+      scales: {
+        y: {
+          beginAtZero: true,
+        },
+      },
+    }))
+    const chartData = computed(() => {
+      const _firstStudentStats = firstStudentStats.value
+      return {
+        labels: _firstStudentStats.alphabetsStats.map((ele) => ele.alphabet),
+        datasets: [
+          {
+            label: 'ทั้งหมด',
+            backgroundColor: '#6666FF',
+            data: _firstStudentStats.alphabetsStats.map((ele) => ele.counts),
+          },
+          {
+            label: 'ถูก',
+            backgroundColor: '#41B38A',
+            data: _firstStudentStats.alphabetsStats.map((ele) => ele.corrects),
+          },
+          {
+            label: 'ผิด',
+            backgroundColor: '#FF0000',
+            data: _firstStudentStats.alphabetsStats.map((ele) => ele.wrongs),
+          },
+        ],
+      }
+    })
+
+    const { barChartProps, barChartRef } = useBarChart({
+      chartData,
+      options,
+    })
+
+    return {
+      studentDocs,
+      firstStudentStats,
+      formatDate,
+      barChartProps,
+      barChartRef,
+    }
   },
   data() {
     return {
-      studentDocs: [],
       tableSummary: null,
       filters: {},
+      showAlphabetGrid: false,
     }
   },
   async fetch() {
-    this.studentDocs = []
-
-    let hasNext = true
-    let prevIdStart = null
-
-    while (hasNext) {
-      const qs = [
-        {
-          name: 'limit',
-          value: DATA_PER_CHUNK,
-        },
-        {
-          name: 'prevIdStart',
-          value: prevIdStart,
-        },
-      ]
-        .filter((ele) => Boolean(ele.value))
-        .map((ele) => `${ele.name}=${ele.value}`)
-        .join('&')
-
-      const { response } = await this.$axios.$get(`/api/report/summary?${qs}`)
-
-      hasNext = response.hasNext
-      if (hasNext) {
-        prevIdStart = response.students[response.students.length - 1]._id
-      }
-
-      this.studentDocs.push(...response.students)
-
-      // console.log(this.studentDocs.length, hasNext, prevIdStart)
-    }
-
-    if (this.tableSummary) {
-      this.tableSummary.replaceData(this.studentDocs)
-    }
+    await this.fetchSummary()
   },
   head: {
     title: 'LD Report - หน้าหลัก',
@@ -291,10 +386,13 @@ export default {
   },
   methods: {
     initTables() {
+      if (!this.$refs['tabulator-summary']) {
+        return
+      }
+
       this.tableSummary = new Tabulator(this.$refs['tabulator-summary'], {
         data: this.studentDocs,
         layout: 'fitData',
-        height: '300px',
         columns: [
           {
             title: '',
@@ -422,13 +520,45 @@ export default {
       })
       this.tableSummary.setFilter(this.tableFilters)
     },
-    formatDate(date) {
-      return dayjs(date).locale('th').format('D MMMM พ.ศ. BBBB H:mm น.')
+    async fetchSummary() {
+      this.studentDocs = []
+
+      let hasNext = true
+      let prevIdStart = null
+
+      while (hasNext) {
+        const qs = [
+          {
+            name: 'limit',
+            value: DATA_PER_CHUNK,
+          },
+          {
+            name: 'prevIdStart',
+            value: prevIdStart,
+          },
+        ]
+          .filter((ele) => Boolean(ele.value))
+          .map((ele) => `${ele.name}=${ele.value}`)
+          .join('&')
+
+        const { response } = await this.$axios.$get(`/api/report/summary?${qs}`)
+
+        hasNext = response.hasNext
+        if (hasNext) {
+          prevIdStart = response.students[response.students.length - 1]._id
+        }
+
+        this.studentDocs.push(...response.students)
+
+        if (this.tableSummary) {
+          this.tableSummary.replaceData(this.studentDocs)
+        }
+      }
     },
     link(format) {
       return `/api/report/export/summary?format=${format}`
     },
   },
   fetchOnServer: false,
-}
+})
 </script>
